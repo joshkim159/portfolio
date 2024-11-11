@@ -1,0 +1,195 @@
+@font-face {
+    font-family: 'Pretendard-Light';
+    src: url('https://fastly.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Light.woff') format('woff');
+    font-weight: 300;
+    font-style: normal;
+} 
+@font-face {
+    font-family: 'Pretendard-Regular';
+    src: url('https://fastly.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Regular.woff') format('woff');
+    font-weight: 400;
+    font-style: normal;
+} 
+@font-face {
+    font-family: 'Pretendard-Medium';
+    src: url('https://fastly.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Medium.woff') format('woff');
+    font-weight: 500;
+    font-style: normal;
+} 
+@font-face {
+    font-family: 'Pretendard-SemiBold';
+    src: url('https://fastly.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-SemiBold.woff') format('woff');
+    font-weight: 600;
+    font-style: normal;
+} 
+@font-face {
+    font-family: 'Pretendard-Bold';
+    src: url('https://fastly.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Bold.woff') format('woff');
+    font-weight: 700;
+    font-style: normal;
+}
+
+.mypage {
+    margin: 0;
+    flex-basis: 10%;
+}
+
+
+.mypage_side {
+    width: 220px;
+    padding: 0 15px;
+}
+
+.sidebox {
+    margin-top: 50px;
+    box-sizing: border-box;
+    text-align: left;
+    float: left;
+    width: 220px;
+    height: 459px;
+    border: 1px solid #EFEFEF;
+}
+
+.sidebox ul{
+    list-style: none;
+    padding : 20px 20px 0px 15px;
+}
+
+.sidebox_List li:hover {
+    color: #199AE2;
+  }
+
+.sidebox_text {
+    font-family: 'Pretendard-SemiBold';
+    font-style: normal;
+    height: 117px;
+    line-height: 19px;
+    font-size: 16px;
+    padding-top: 50px;
+    margin: -50px 0;
+}
+
+.sidebox_quitbutton {
+    background-color: #fff;
+    padding: 0 10px 20px 0;
+    border: none;
+    outline: none;
+    font-family: 'Pretendard-SemiBold';
+    font-style: normal;
+    line-height: 19px;
+    font-size: 20px;
+}
+
+.sidebox_quitbutton:hover {
+    color: #199AE2;
+}
+
+  
+.mypage_list {
+    display: flex;
+    width: 100%;
+}
+
+.search_form {
+ text-align: right;
+ margin-right: 30px;
+}
+
+.mypage_container {
+    display: flex;
+    justify-content: space-around;
+}
+
+.booklist_con{
+    margin-top: 40px;
+    width: 100%;
+}
+
+.mypage_container .content_body{
+    flex-basis: 80%;
+}
+
+.mypage_pagination .pagination{
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.mypage_pagination .pagination li{
+    margin-right: 10px;
+}
+
+.search_form input::placeholder{
+    color:#ccc
+}
+
+.search_form button{
+    background: none;
+    border:none;
+}
+
+.search_form .booksearch_icon{
+    width: 13px;
+    height: 13px;
+    position: relative;
+    display: block;
+    left: 5px;
+}
+
+.search_form input{
+    border:1px solid #199AE2;
+    text-align: center;
+    border-radius: 5px;
+}
+
+.search_form .booksearch_icon:before{
+    content:'';
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius:50%;
+    border:1px solid #199AE2;
+    position: absolute;
+    left: 0;
+    top: 0;}
+
+.search_form .booksearch_icon:after{
+    content:'';
+    display: block;
+    width: 5px;
+    height: 1px;
+    background:#199AE2;
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    transform:rotate(45deg)
+    translate(-50%,-150%)
+}
+
+.mypage_paging {
+    margin: 100px 70px 50px 0;
+}
+
+.mypage_item_line {
+    border-top: 1px solid #000000;
+    width: 1000px;
+    margin-top: 60px;
+    margin-bottom: -40px;
+}
+
+
+.wishlist_list {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap; 
+    justify-content: flex-start;
+    gap: 15px;
+}
+
+.wishlist_items {
+    display: flex;
+    padding-top: 40px;
+    flex-basis: 24%;
+    /* max-width: 300px; */
+    box-sizing: border-box;
+}
