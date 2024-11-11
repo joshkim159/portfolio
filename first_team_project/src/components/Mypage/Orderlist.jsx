@@ -183,7 +183,6 @@ export default function Orderlist() {
                     ) : (
                       <button onClick={() => handleReviewClick(getMergeData.productcode, getMergeData.userid)}>리뷰 쓰기</button>
                     )}
-                    <button>리뷰 수정</button>
                   </div>
                 </div>
               </div>

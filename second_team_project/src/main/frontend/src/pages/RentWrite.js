@@ -39,17 +39,6 @@ const RentWrite =()=>{
         setFile(e.target.files[0]);
     };
 
-    const fetchImageFile = async (imageUrl) => {
-        try {
-            const response = await fetch(imageUrl);
-            const blob = await response.blob();
-            const file = new File([blob], "thumbnail.jpg", { type: blob.type });
-            setFile(file);
-        } catch (error) {
-            console.error("Error fetching the image:", error);
-        }
-    }
-
     const fetchBookData = async() => {
         if (input.isbn) {
             try {
@@ -63,9 +52,7 @@ const RentWrite =()=>{
                         publishDate: response.data.publishDate,
                         publisher:response.data.publisher,
                         genre: response.data.genre,
-                        bookImgUrl: response.data.bookImgUrl,
                     });
-                    fetchImageFile(response.data.bookImgUrl);
                 } else {
                     alert('최신 도서는 등록되어 있지 않습니다');
                 }
@@ -194,7 +181,7 @@ const RentWrite =()=>{
                     </p>
                     <p>
                         <label htmlFor="file">책 이미지</label>
-                        <input onChange={onFileChange} type="file" name="bookImgUrl" id="bookImgUrl" value={file ? file.name : ""}
+                        <input onChange={onFileChange} type="file" name="bookImgUrl" id="bookImgUrl" value={input.file}
                                accept="image/gif, image/jpeg, image/png"/>
                     </p>
                     <div className="btn_area">

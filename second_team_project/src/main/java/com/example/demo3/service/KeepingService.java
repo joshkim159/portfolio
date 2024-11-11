@@ -1,270 +1,278 @@
 package com.example.demo3.service;
 
-import com.example.demo3.dto.KeepingDTO;
+import com.example.demo3.dto.BookDTO;
 import com.example.demo3.model.BookEntity;
-import com.example.demo3.model.KeepingEntity;
 import com.example.demo3.persistence.BookRepository;
-import com.example.demo3.persistence.KeepingRepository;
-import com.example.demo3.persistence.UserRepository;
-import jakarta.transaction.Transactional;
-import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
-
-
-import java.time.LocalDateTime;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+
 @Service
-@Slf4j
-public class KeepingService {
+public class BookService {
+
+    private final BookRepository bookRepository;
 
     @Autowired
-    private KeepingRepository keepingRepository;
-
-    @Autowired
-    private BookRepository bookRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-
-    public Page<KeepingDTO> getAllKeepings(Pageable pageable) {
-        log.info("All keeping List");
-        return keepingRepository.findAll(pageable)
-                .map(KeepingDTO::new);
+    public BookService(BookRepository bookRepository) {
+        this.bookRepository = bookRepository;
     }
 
-    public Page<KeepingDTO> searchKeepingsByUser (Long userId, String keyword, Pageable pageable) {
-        return keepingRepository.searchKeepingsByUser(userId, keyword, pageable).map(KeepingDTO::new);
-    }
-
-    public Page<KeepingDTO> userGivenInfo(final Long userId, Pageable pageable) {
-        log.info("Given information from user: {}", userId);
-        return keepingRepository.findByUserId(userId, pageable)
-                .map(KeepingDTO::new);
-    }
-
-    public List<KeepingEntity> getAllKeepingsByUserId(Long userId) {
-        return keepingRepository.findByUserId(userId);
-    }
-
-    public Page<KeepingEntity> searchKeepings(Long userId, String keyword, Pageable pageable) {
-        return keepingRepository.searchAllByKeyword(userId, keyword, pageable);
-    }
-
-    public KeepingDTO getKeepingById(int keepingId) {
-        log.info("Fetching keeping by id: {}", keepingId);
-        KeepingEntity keepingEntity = keepingRepository.findById(keepingId)
-                .orElseThrow(() -> new IllegalArgumentException("No keeping found with id: " + keepingId));
-        return new KeepingDTO(keepingEntity);
-    }
-
-    public Page<KeepingEntity> searchKeepingList(String keyword, Pageable pageable) {
-        return keepingRepository.findByISBNContainingOrBookNameContaining( keyword, keyword, pageable);
-    }
-
-    @Transactional
-    public KeepingDTO saveKeeping(KeepingDTO keepingDTO) {
-        log.info("new keeping: {}", keepingDTO);
-
-        KeepingEntity keepingEntity = KeepingDTO.toEntity(keepingDTO);
-        keepingEntity.setUserId(userRepository.findById(keepingDTO.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("맞는 유저가 없습니다")).getUserId());
-        keepingEntity.setKeepStatus(0); // 0: 초기 상태
-        keepingEntity.setKeepDate(LocalDateTime.now());
-
-        keepingEntity = keepingRepository.save(keepingEntity);
-        log.info("keeping success: {}", keepingEntity);
-
-        return new KeepingDTO(keepingEntity);
-    }
-
-
-    @Transactional
-    public String updateKeepStatusAndQuantities(String ISBN, String bookName) {
-
-        Optional<BookEntity> optionalBook = bookRepository.findByISBN(ISBN);
-        if (!optionalBook.isPresent()) {
-            throw new IllegalArgumentException("Book with ISBN " + ISBN + " not found");
-        }
-
-        BookEntity book = optionalBook.get();
-
-        List<KeepingEntity> keepings = keepingRepository.findByISBN(ISBN);
-        int stockIncrease = 0;
-        int totalQuantityIncrease = 0;
-
-        StringBuilder messageBuilder = new StringBuilder();
-        boolean isAnyBookNameMismatch = false;
-
-        for (KeepingEntity keeping : keepings) {
-            if (keeping.getKeepStatus() == 0) {
-                if (keeping.getBookId() == 0) {
-                    keeping.setBookId(book.getBookId());
-                }
-                // BookName이 틀리면 수정하고 메시지에 추가
-                if (!book.getBookName().equals(bookName)) {
-                    keeping.setBookName(book.getBookName());
-                    isAnyBookNameMismatch = true;
-                    messageBuilder.append("KeepingEntity with ID ")
-                            .append(keeping.getKeepingId())
-                            .append(" has a mismatched bookName. Updated to correct bookName '")
-                            .append(book.getBookName())
-                            .append("'.\n");
-                }
-
-                keeping.setKeepStatus(1);
-                keepingRepository.save(keeping);
-                if (keeping.isRentable()) {
-                    stockIncrease++;
-                }
-                totalQuantityIncrease++;
-            }
-        }
-
-        book.setStock(book.getStock() + stockIncrease);
-        book.setTotalQuantity(book.getTotalQuantity() + totalQuantityIncrease);
-        bookRepository.save(book);
-
-        log.info("KeepStatus and book quantities updated for ISBN: {}", ISBN);
-
-        if (messageBuilder.length() == 0) {
-            return "KeepStatus and quantities updated successfully.";
-        } else {
-            return messageBuilder.toString();
-        }
-    }
-
-    public KeepingDTO returnedBook(KeepingEntity entity) {
-        KeepingEntity keeping = keepingRepository.findById(entity.getKeepingId())
-                .orElseThrow(() -> new IllegalArgumentException("There is no kept nor rented item"));
-        if (keeping.getKeepStatus() != 2) {
-            throw new RuntimeException("This book has never been rented");
-        }
-
-        BookEntity book = bookRepository.findById(keeping.getBookId())
-                .orElseThrow(() -> new IllegalArgumentException("There is no such a book"));
-
-        keeping.setKeepStatus(1); // 상태를 보관 중으로 변경
-        keeping.setLastBorrowed(LocalDateTime.now()); // 반환 시각 업데이트
-        keeping.setCount(keeping.getCount() + 1);
-        keepingRepository.save(keeping);
-
-        // 책 재고 증가
-        book.setStock(book.getStock() + 1);
-        bookRepository.save(book);
-
-        log.info("Book returned: {}", book.getBookId());
-        return new KeepingDTO(keeping);
-    }
-
-    @Transactional
-    public void requestReturn(int keepingId) {
-        KeepingEntity keeping = keepingRepository.findById(keepingId)
-                .orElseThrow(() -> new IllegalArgumentException("There is no kept item with id: " + keepingId));
-        if (keeping.getKeepStatus() != 1) {
-            throw new RuntimeException("This book is either pending or renting");
-        }
-        keeping.setKeepStatus(3); // 3: returnRequest 상태로 변경
-        keepingRepository.save(keeping);
-        log.info("Return requested for keepingId: {}", keepingId);
-    }
-
-    @Transactional
-    public void approveReturn(int keepingId) {
-        KeepingEntity keeping = keepingRepository.findById(keepingId)
-                .orElseThrow(() -> new IllegalArgumentException("There is no kept item with id: " + keepingId));
-        if (keeping.getKeepStatus() != 3) { // 3: returnRequest 상태여야 승인 가능
-            throw new RuntimeException("This book is not in return request status");
-        }
-
-        keeping.setKeepStatus(4); // 4: returned 상태로 변경
-        keepingRepository.save(keeping);
-
-        BookEntity book = bookRepository.findById(keeping.getBookId())
-                .orElseThrow(() -> new IllegalArgumentException("There is no such a book"));
-
-        // stock 및 totalQuantity 감소
-        if (keeping.isRentable()) {
-            book.setStock(book.getStock() - 1);
-            book.setTotalQuantity(book.getTotalQuantity() - 1);
-        } else {
-            book.setTotalQuantity(book.getTotalQuantity() - 1);
-        }
-        bookRepository.save(book);
-
-        log.info("Book stock and totalQuantity decreased for bookId: {}", book.getBookId());
-    }
-
-    public Page<KeepingDTO> getKeepingsByStatus(int keepStatus, Pageable pageable) {
-        log.info("Fetching keepings by status: {}", keepStatus);
-        return keepingRepository.findByKeepStatus(keepStatus, pageable)
-                .map(KeepingDTO::new);
-    }
-
-    @Transactional
-    public void initializeStockAndCreateKeepingForZeroQuantityBooks() {
-        // Step 1: stock과 totalQuantity가 0인 도서를 조회합니다.
-        List<BookEntity> zeroQuantityBooks = bookRepository.findByStockAndTotalQuantity(0, 0);
-
-        for (BookEntity book : zeroQuantityBooks) {
-            // Step 2: 각 도서의 stock과 totalQuantity를 1씩 증가시킵니다.
-            book.setStock(1);
-            book.setTotalQuantity(1);
-            bookRepository.save(book);
-
-            // Step 3: userId가 1인 새로운 키핑 엔티티를 생성합니다.
-            KeepingEntity newKeeping = KeepingEntity.builder()
-                    .userId(1L)  // userId가 1인 사용자
-                    .bookId(book.getBookId())
-                    .bookName(book.getBookName())
-                    .ISBN(book.getISBN())
-                    .keepStatus(1)  // 초기 상태
-                    .keepDate(LocalDateTime.now())
-                    .rentable(true)  // 기본적으로 대여 가능 상태로 설정
-                    .build();
-
-            keepingRepository.save(newKeeping);
-        }
-
-        log.info("Stock and totalQuantity initialized, and Keepings created for zero quantity books");
-    }
-
-
-    public  List<KeepingDTO> findByISBN(String ISBN) {
-        log.info("List of all rentable");
-        return keepingRepository.findByISBNAndRentableAndKeepStatus(ISBN, true, 1)
-                .stream()
-                .map(KeepingDTO::new)
+    public List<BookDTO> getAllBooks() {
+        List<BookEntity> books = bookRepository.findAll();
+        return books.stream()
+                .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
-    public KeepingDTO Bookmatching(final KeepingEntity entity) {
-        final Optional<KeepingEntity> original = keepingRepository.findById(entity.getKeepingId());
-        if (original.isPresent()) {
-            KeepingEntity keeping = original.get();
-            keeping.setKeepingId(entity.getKeepingId());
-            keeping.setKeepStatus(entity.getKeepStatus());
-            keepingRepository.save(keeping);
+    public BookDTO getBookById(int bookId) {
+        BookEntity book = bookRepository.findById(bookId).orElse(null);
+        return (book != null) ? convertToDTO(book) : null;
+    }
 
-            BookEntity book = bookRepository.findById(keeping.getBookId())
-                    .orElseThrow(() -> new IllegalArgumentException("There is no such a book"));
-            // 책 재고 감소
-            book.setStock(book.getStock() - 1);
+    public BookDTO addBook(BookDTO bookDTO, MultipartFile file) {
+        Optional<BookEntity> existingBook = bookRepository.findByISBN(bookDTO.getISBN());
+        if (existingBook.isPresent()) {
+            throw new RuntimeException("ISBN 넘버 " + bookDTO.getISBN() + "은 이미 등록되었습니다");
+        }
 
-            bookRepository.save(book);
-            log.info("rent updated:{}", keeping.getKeepingId());
-            return new KeepingDTO(keeping);
+        // 파일 저장 처리
+        if (file != null) {
+
+            String filePath = saveFile(file);
+            bookDTO.setBookImgUrl(filePath);
         } else {
-            log.warn("rent not found: {}", entity.getKeepingId());
-            throw new RuntimeException("rent not found");
+            // 이미지 파일이 제공되지 않으면 기존 이미지 URL을 유지
+        }
+
+        BookEntity book = convertToEntity(bookDTO, file);
+        BookEntity savedBook = bookRepository.save(book);
+        return convertToDTO(savedBook);
+    }
+
+    public BookDTO updateBook(int bookId, BookDTO bookDTO, MultipartFile file) {
+        BookEntity existingBook = bookRepository.findById(bookId).orElse(null);
+        String existingImageUrl = existingBook.getBookImgUrl();
+        if (existingBook != null) {
+            if (file != null) {
+                String filePath = saveFile(file);
+                bookDTO.setBookImgUrl(filePath);
+                if (existingImageUrl != null && !existingImageUrl.equals(filePath)) {
+                    deleteFile(existingImageUrl);
+                }
+            } else {
+                // 이미지 파일이 제공되지 않으면 기존 이미지 URL을 유지
+                bookDTO.setBookImgUrl(existingBook.getBookImgUrl());
+            }
+            BeanUtils.copyProperties(bookDTO, existingBook, "bookId");
+            bookRepository.save(existingBook);
+            return convertToDTO(existingBook);
+        }
+        return null;
+    }
+
+    public boolean deleteBook(int bookId) {
+        if (bookRepository.existsById(bookId)) {
+            BookEntity existingBook = bookRepository.findById(bookId).orElse(null);
+            if (existingBook != null) {
+                // 게시글 삭제 시 이미지 파일 삭제
+                String imageUrl = existingBook.getBookImgUrl();
+                if (imageUrl != null) {
+                    deleteFile(imageUrl);
+                }
+                bookRepository.deleteById(bookId);
+                return true;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public List<BookEntity> getSearchList(String keyword) {
+        // Retrieve all books
+        List<BookEntity> allBooks = bookRepository.findAll(); // Assuming this method exists
+
+        // Filter books based on keyword
+        return allBooks.stream()
+                .filter(book -> book.getBookName().contains(keyword) || book.getDescription().contains(keyword))
+                .collect(Collectors.toList());
+    }
+    private BookEntity convertToEntity(BookDTO bookDTO, MultipartFile file) {
+        // 파일 저장 처리
+        String filePath = (file != null) ? file.getOriginalFilename() : "no-image01.gif";
+        return BookEntity.builder()
+                .bookId(bookDTO.getBookId())
+                .ISBN(bookDTO.getISBN())
+                .bookName(bookDTO.getBookName())
+                .bookImgUrl(filePath)
+                .publisher(bookDTO.getPublisher())
+                .author(bookDTO.getAuthor())
+                .publishDate(bookDTO.getPublishDate())
+                .genre(bookDTO.getGenre())
+                .pages(bookDTO.getPages())
+                .description(bookDTO.getDescription())
+                .stock(bookDTO.getStock())
+                .totalQuantity(bookDTO.getTotalQuantity())
+                .build();
+    }
+    private BookDTO convertToDTO(BookEntity book) {
+        return BookDTO.builder()
+                .bookId(book.getBookId())
+                .ISBN(book.getISBN())
+                .bookName(book.getBookName())
+                .bookImgUrl(book.getBookImgUrl())
+                .publisher(book.getPublisher())
+                .author(book.getAuthor())
+                .publishDate(book.getPublishDate())
+                .genre(book.getGenre())
+                .pages(book.getPages())
+                .description(book.getDescription())
+                .stock(book.getStock())
+                .totalQuantity(book.getTotalQuantity())
+                .build();
+    }
+
+    private String saveFile(MultipartFile file) {
+        String fileName = file.getOriginalFilename();
+
+        try {
+            Path path = Paths.get("src/main/resources/static/files/" + fileName);
+            Files.write(path, file.getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return fileName;
+    }
+    private void deleteFile(String fileName) {
+        Path path = Paths.get("src/main/resources/static/files/" + fileName);
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
+    public BookDTO getBookByISBN(String ISBN) {
+        BookEntity book = bookRepository.findByISBN(ISBN).orElse(null);
+        return (book != null) ? convertToDTO(book) : null;
+    }
+    public void saveBooksFromCSV() {
+        String filePath = "src/main/resources/data/book4_clean.csv";
+        List<BookEntity> books = new ArrayList<>();
+
+        try (Reader reader = new InputStreamReader(new FileInputStream(filePath), "UTF-8");
+             CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader())) {
+
+            for (CSVRecord record : csvParser) {
+                try {
+                    BookEntity book = BookEntity.builder()
+                            .ISBN(record.get(5))  // ISBN 필드를 String으로 그대로 사용
+                            .bookName(record.get(1))  // title
+                            .bookImgUrl(record.get(9))  // book_img_url
+                            .publisher(record.get(3))  // publisher
+                            .author(record.get(2))  // author
+                            .publishDate(record.get(4))  // publishDate
+                            .genre(record.get(7))  // genre
+                            .pages(Integer.parseInt(record.get(6)))  // pages
+                            .description(record.get(8))  // description
+                            .stock(Integer.parseInt(record.get(10)))  // stock
+                            .totalQuantity(Integer.parseInt(record.get(11)))  // totalQuantity
+                            .build();
+                    books.add(book);
+                } catch (NumberFormatException e) {
+                    System.out.println("can't turn into Int: " + e.getMessage() + " in line: " + record);
+                }
+            }
+            bookRepository.saveAll(books);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public boolean isBooksTableEmpty() {
+        return bookRepository.count() == 0;
+    }
+
+    private final String apiKey = "af528ebbcc89187904b5aedbcd43dc9fdf67cb043dee213f6280ba7a46097ef5";
+    private final String baseUrl = "https://www.nl.go.kr/NL/search/openApi/search.do";
+
+    public BookDTO fetchBookDataByISBN(String ISBN) {
+        String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
+                .queryParam("key", apiKey)
+                .queryParam("detailSearch", "true")  // 상세 검색 활성화
+                .queryParam("isbnOp", "isbn")        // ISBN 검색 옵션 추가
+                .queryParam("isbnCode", ISBN)
+                .toUriString();
+
+        RestTemplate restTemplate = new RestTemplate();
+        String centralLibraryResponse = restTemplate.getForObject(url, String.class);
+        System.out.println("XML Response: " + centralLibraryResponse);
+
+        try {
+            return parseCentralLibraryResponse(centralLibraryResponse, ISBN);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private BookDTO parseCentralLibraryResponse(String centralLibraryResponse, String ISBN) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document document = builder.parse(new ByteArrayInputStream(centralLibraryResponse.getBytes()));
+
+        document.getDocumentElement().normalize();
+
+        NodeList itemList = document.getElementsByTagName("item");
+        if (itemList.getLength() > 0) {
+            Node itemNode = itemList.item(0);
+
+            if (itemNode.getNodeType() == Node.ELEMENT_NODE) {
+                Element itemElement = (Element) itemNode;
+
+                String bookTitle = getTagValue("title_info", itemElement);
+                String author = getTagValue("author_info", itemElement);
+                String publisher = getTagValue("pub_info", itemElement);
+                String publishDate = getTagValue("pub_year_info", itemElement);
+                String category = getTagValue("kdc_name_1s", itemElement);
+
+                return BookDTO.builder()
+                        .ISBN(ISBN)
+                        .bookName(bookTitle)
+                        .author(author)
+                        .publisher(publisher)
+                        .publishDate(publishDate)
+                        .genre(category)
+                        .build();
+            }
+        }
+        return null;
+    }
+
+    private String getTagValue(String tag, Element element) {
+        NodeList nodeList = element.getElementsByTagName(tag).item(0).getChildNodes();
+        Node node = nodeList.item(0);
+        return node != null ? node.getNodeValue() : null;
+    }
 }

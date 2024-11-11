@@ -20,7 +20,7 @@ app.use(express.static(path.join(__dirname + "/images")));
 const connection = mysql.createConnection({
   host: "localhost",
   user: "root",
-  password: "10541054",
+  password: "970320",
   database: "shopping_db",
   port: 3306,
 });
@@ -28,7 +28,7 @@ const connection = mysql.createConnection({
 const PromiseConnection = mysqlPromise.createPool({
   host: "localhost",
   user: "root",
-  password: "10541054",
+  password: "970320",
   database: "shopping_db",
   port: 3306,
 });
